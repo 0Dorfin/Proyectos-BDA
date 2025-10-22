@@ -1,0 +1,52 @@
+services:
+  orion:
+    image: fiware/orion
+    container_name: orion
+    ports:
+      - "1026:1026"
+    command: -logLevel DEBUG -noCache -dbURI mongodb://mongo:27017
+    environment:
+     - MONGO_HOST=mongo
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:4.4
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  quantumleap:
+    image:  fiware/quantum-leap
+    container_name: quatum-leap
+    ports:
+      - "8668:8668"
+    depends_on:
+      - mongo
+      - orion
+      - crate
+    environment:
+      - CRATE_HOST=crate
+
+  crate:
+    image: crate:5.0.0
+    container_name: crate
+    ports:
+      - "4200:4200"
+    volumes:
+      - cratedata:/data
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - "GF_SECURITY_ADMIN_PASSWORD=admin"  # Cambia según tus preferencias
+    depends_on:
+      - quantumleap
+volumes:
+    mongodata:
+    cratedata:
