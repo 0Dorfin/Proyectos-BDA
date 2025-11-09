@@ -1,0 +1,62 @@
+import requests
+import json
+import sys
+
+SUBSCRIPTION_URL = "http://localhost:1026/v2/subscriptions"
+HEADERS = {
+    "Content-Type": "application/json",
+}
+
+suscripciones = {
+    "description": "Suscripcion a QuantumLeap para todas las entidades",
+    "subject": {  
+                "entities": [
+            { 
+                "idPattern": ".*", 
+                "type": "sensor_temperatura" 
+            },
+            { 
+                "idPattern": ".*", 
+                "type": "sensor_co2" 
+            },
+            { 
+                "idPattern": ".*", 
+                "type": "sensor_calidad_agua" 
+            }
+        ],
+        "condition": {
+            "attrs": [
+                "temperatura",
+                "humedad",
+                "co2",
+                "ph",
+                "chlorine"
+            ]
+        }
+    },
+    "notification": {
+        "http": {
+            "url": "http://quantumleap:8668/v2/notify" 
+        },
+        "attrsFormat": "normalized"
+    },
+    "throttling": 0
+}
+
+def creacion_suscripciones():
+    try:
+        response = requests.post(SUBSCRIPTION_URL, headers=HEADERS, json=suscripciones)
+        
+        if response.status_code == 201:
+            print(f"Suscripción creada")
+        elif response.status_code == 422:
+             print(f"La suscripción ya existe")
+        else:
+            print(f"Error al crear la suscripción: {response.status_code} {response.text}")
+            
+    except requests.exceptions.ConnectionError:
+        print(f"Error de conexión")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    creacion_suscripciones()
