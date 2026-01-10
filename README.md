@@ -5,6 +5,9 @@ Repositorio con los proyectos del módulo de BDA
 **Estructura de Directorios**
 
 * **Proyecto-Analisis-Academico/**
+  * **Ingesta-NiFi/**
+      * `Analisis_Academico_Flujo.json` (Flujo NIFI)
+      * `configuracion.md`
   * **Arquitectura-Datos/**
       * `Arquitectura_Data_Lakehouse.md` (Definición de buckets S3)
       * `diseño_data_warehouse.png` (Esquema en copo de nieve) 
