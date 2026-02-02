@@ -4,14 +4,17 @@ import hashlib
 from datetime import datetime
 from sqlalchemy import create_engine, text
 from airflow.hooks.base import BaseHook
+import os
 
-def get_aws_engine(conn_id='mysql_db'):
+CONN_ID = os.getenv('AIRFLOW_MYSQL_CONN_ID')
+
+def get_aws_engine(conn_id=CONN_ID):
     connection = BaseHook.get_connection(conn_id)
     db_url = f"mysql+pymysql://{connection.login}:{connection.password}@{connection.host}:{connection.port}/{connection.schema}"
     engine = create_engine(db_url)
     return engine
 
-def crear_tablas(conn_id='mysql_db'):
+def crear_tablas(conn_id=CONN_ID):
     engine = get_aws_engine(conn_id)
     
     queries = [
@@ -65,7 +68,7 @@ def crear_tablas(conn_id='mysql_db'):
         for q in queries:
             conn.execute(text(q))
 
-def cargar_datos_bd(path_parquet, tabla_destino, conn_id='mysql_db'):
+def cargar_datos_bd(path_parquet, tabla_destino, conn_id=CONN_ID):
     if not os.path.exists(path_parquet):
         print(f"No existe el archivo {path_parquet}")
         return
