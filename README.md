@@ -23,8 +23,8 @@ Repositorio con los proyectos del módulo de BDA
         * `dag_ingesta.py` (Capa Bronze: Validación e ingesta raw)
         * `dag_transformaciones.py` (Capa Silver: Limpieza y aplanado)
         * `dag_carga_warehouse.py` (Capa Gold: Carga final a MySQL)
-      * `docker-compose.yaml` (Configuración de infraestructura Airflow)
-      * `README.md` (Documentación de Práctica 5.1)
+    * `docker-compose.yaml` (Configuración de infraestructura Airflow)
+    * `README.md` (Documentación de Práctica 5.1)
   * `csv_to_parquet.py`
   * `Readme_Analisis.md` (Documentación del Proyecto Análisis Académico)
 * **Proyecto-Smart-City/**
