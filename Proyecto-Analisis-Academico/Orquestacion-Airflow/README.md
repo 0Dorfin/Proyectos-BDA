@@ -49,7 +49,8 @@ Tecnologías Utilizadas
 
 ### Puesta en marcha
 1. Clonar el repositorio.
-2. Levantar el entorno:
+2. Configurar las variables de entorno en .env.
+3. Levantar el entorno:
 ```bash
 docker compose up -d
 ```
