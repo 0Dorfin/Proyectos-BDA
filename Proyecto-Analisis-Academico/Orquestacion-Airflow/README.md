@@ -18,7 +18,7 @@ ORQUESTACION-AIRFLOW/
 │   ├── dag_ingesta.py          # Capa Bronze
 │   ├── dag_transformaciones.py # Capa Silver
 │   ├── dag_carga_warehouse.py  # Capa Gold
-│   ├── include/                # Utils para dags
+│   ├── include/                # Utils para DAGs
 │   │   ├── ingesta_utils.py
 │   │   ├── transformaciones_utils.py
 │   │   └── carga_warehouse_utils.py
