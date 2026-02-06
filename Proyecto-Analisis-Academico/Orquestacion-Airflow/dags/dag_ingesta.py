@@ -61,7 +61,11 @@ with DAG(
     t_log = PythonOperator(
         task_id='registrar_log_bronze',
         python_callable=registro_log_bronze,
-        op_kwargs={'bronze_path': BRONZE_PATH, 'log_path': LOG_PATH}
+        op_kwargs={
+            'cantidad': "{{ ti.xcom_pull(task_ids='copiar_xml_a_s3_bronze') }}",
+            'bronze_path': BRONZE_PATH,
+            'log_path': LOG_PATH
+        }
     )
 
     t_archivar = PythonOperator(
