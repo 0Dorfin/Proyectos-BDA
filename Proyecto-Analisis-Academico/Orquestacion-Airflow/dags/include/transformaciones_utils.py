@@ -1,10 +1,17 @@
 import os
 import pandas as pd
 from datetime import datetime
+import hashlib
+
+def hashear_nia(nia):
+    if pd.isna(nia):
+        return 'UNKNOWN'
+    return hashlib.sha256(str(nia).encode()).hexdigest()[:10]
 
 def limpiar_alumnos(temp_path, silver_path):
     subcarpetas = [d for d in os.listdir(temp_path) if os.path.isdir(os.path.join(temp_path, d))]
-    
+    count = 0
+
     for anyo_folder in subcarpetas:
         ruta_csv = os.path.join(temp_path, anyo_folder, 'Alumnos.csv')
         
@@ -14,15 +21,25 @@ def limpiar_alumnos(temp_path, silver_path):
         cols = ['anyo', 'NIA', 'fecha_nac', 'sexo', 'estado_matricula', 'curso', 'grupo', 'turno']
         
         df = df[cols].copy().drop_duplicates()
+
+        if 'fecha_nac' in df.columns:
+            df['fecha_nac'] = pd.to_datetime(df['fecha_nac'], dayfirst=True, errors='coerce')
+            df['fecha_nac'] = df['fecha_nac'].dt.strftime('%Y-%m-%d')
+
+        df['NIA'] = df['NIA'].apply(hashear_nia)
         
         folder_dest = os.path.join(silver_path, anyo_folder.replace("/", "-"))
         if not os.path.exists(folder_dest): os.makedirs(folder_dest)
         
         df.to_csv(os.path.join(folder_dest, 'Alumnos.csv'), index=False)
+        count += 1
+
+    return count
 
 def limpiar_calificaciones(temp_path, silver_path):
     subcarpetas = [d for d in os.listdir(temp_path) if os.path.isdir(os.path.join(temp_path, d))]
     
+    count = 0
     for anyo_folder in subcarpetas:
         ruta_csv = os.path.join(temp_path, anyo_folder, 'Calificaciones.csv')
         
@@ -33,6 +50,7 @@ def limpiar_calificaciones(temp_path, silver_path):
         df['nota_numerica'] = pd.to_numeric(df['nota_numerica'], errors='coerce')
         df = df.dropna(subset=['nota_numerica'])
         df.rename(columns={'alumno': 'nia'}, inplace=True)
+        df['nia'] = df['nia'].apply(hashear_nia)
         df['evaluacion'] = df['evaluacion'].astype(str)
         df['contenido'] = df['contenido'].astype(str)
         df['nota_numerica'] = df['nota_numerica'].astype(int)
@@ -44,10 +62,14 @@ def limpiar_calificaciones(temp_path, silver_path):
         if not os.path.exists(folder_dest): os.makedirs(folder_dest)
         
         df_final.to_csv(os.path.join(folder_dest, 'Calificaciones.csv'), index=False)
+        count += 1
+
+    return count
 
 def limpiar_cursos_modulos(temp_path, silver_path):
     subcarpetas = [d for d in os.listdir(temp_path) if os.path.isdir(os.path.join(temp_path, d))]
     
+    count = 0
     for anyo_folder in subcarpetas:
         ruta_anyo_temp = os.path.join(temp_path, anyo_folder)
         
@@ -96,13 +118,28 @@ def limpiar_cursos_modulos(temp_path, silver_path):
         
         df_m_final = df_m[['anyo', 'curso', 'codigo', 'nombre_cas']].rename(columns={'nombre_cas': 'nombre'})
         df_m_final.to_csv(os.path.join(folder_silver, 'Modulos.csv'), index=False)
+        count += 2
 
-def registro_log_silver(silver_path, log_path):
+    return count
+
+def combinar_archivos_silver(**context):
+    ti = context['ti']
+    
+    alumnos = ti.xcom_pull(task_ids='limpiar_alumnos') or []
+    calificaciones = ti.xcom_pull(task_ids='limpiar_calificaciones') or []
+    cursos_modulos = ti.xcom_pull(task_ids='limpiar_cursos_modulos') or []
+    
+    todos = alumnos + calificaciones + cursos_modulos
+    return todos
+
+def registro_log_silver(silver_path, log_path, conteos):
     if not os.path.exists(log_path):
         os.makedirs(log_path)
-    archivos = [f for f in os.listdir(silver_path) if f.endswith('.csv')]
-    cantidad = len(archivos)
+    
+    cantidad = sum([int(c) for c in conteos if c is not None])
+    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     mensaje = f"[{timestamp}] Transformaciones completadas. Se han procesado {cantidad} archivos CSV en la carpeta {silver_path}\n"
+    
     with open(os.path.join(log_path, 'log_etl.txt'), 'a') as f:
         f.write(mensaje)
