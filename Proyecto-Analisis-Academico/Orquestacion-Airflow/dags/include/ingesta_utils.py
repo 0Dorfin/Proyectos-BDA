@@ -131,54 +131,6 @@ def copiar_xml_a_s3_bronze(raw_path, s3_bronze_path):
             
     return count
 
-def anonimizar_xml(input_path, output_path):
-    try:
-        tree = ET.parse(input_path)
-        root = tree.getroot()
-        
-        campos_texto = [
-            'nombre', 'apellido1', 'apellido2', 'domicilio', 
-            'nombre_padre', 'nombre_madre'
-        ]
-        
-        campos_contacto = [
-            'telefono1', 'telefono2', 'telefono3', 
-            'email1', 'email2'
-        ]
-        
-        campos_identificacion = [
-            'documento', 'sip', 'nuss', 'libro_escolaridad'
-        ]
-
-        count = 0
-        for alumno in root.findall('.//alumno'):
-            count += 1
-            
-            for campo in campos_texto:
-                if alumno.get(campo):
-                    original = alumno.get(campo)
-                    mascara = 'X' * len(original)
-                    alumno.set(campo, mascara)
-
-            for campo in campos_contacto:
-                val = alumno.get(campo)
-                if val and val.strip():
-                    if 'email' in campo:
-                        alumno.set(campo, 'anonimo@gmail.com')
-                    else:
-                        alumno.set(campo, '000000000')
-
-            for campo in campos_identificacion:
-                if alumno.get(campo):
-                    alumno.set(campo, '00000000X')
-
-        tree.write(output_path, encoding='utf-8', xml_declaration=True)
-        print(f"Proceso completado. {count} alumnos anonimizados.")
-        print(f"Archivo guardado en: {output_path}")
-
-    except Exception as e:
-        print(f"Error al procesar el XML: {e}")
-
 def registro_log_bronze(bronze_path, log_path, cantidad):
     if not os.path.exists(log_path):
         os.makedirs(log_path)
