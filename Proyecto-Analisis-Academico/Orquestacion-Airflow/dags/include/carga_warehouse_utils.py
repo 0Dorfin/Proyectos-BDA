@@ -1,12 +1,12 @@
 import os
 import pandas as pd
-import hashlib
 from datetime import datetime
 from sqlalchemy import create_engine, text
 from airflow.hooks.base import BaseHook
 import os
+import shutil
 
-CONN_ID = os.getenv('AIRFLOW_MYSQL_CONN_ID')
+CONN_ID = os.getenv('AIRFLOW_MYSQL_CONN_ID', 'mysql_db')
 
 def get_aws_engine(conn_id=CONN_ID):
     connection = BaseHook.get_connection(conn_id)
@@ -19,14 +19,6 @@ def crear_tablas(conn_id=CONN_ID):
     
     queries = [
         "CREATE DATABASE IF NOT EXISTS Analisis;",
-        
-        """CREATE TABLE IF NOT EXISTS Analisis.Log_Actividad (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            estado VARCHAR(10),
-            mensaje VARCHAR(255),
-            origen VARCHAR(100)
-        );""",
         
         """CREATE TABLE IF NOT EXISTS Analisis.Dim_Alumnos (
             anyo INT NOT NULL,
@@ -61,6 +53,15 @@ def crear_tablas(conn_id=CONN_ID):
             nota_numerica INT,
             tipo_nota VARCHAR(50),
             PRIMARY KEY (nia, curso, contenido, anyo, evaluacion)
+        );""",
+
+        """CREATE TABLE IF NOT EXISTS Analisis.Log_Actividad (
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            estado VARCHAR(10),
+            mensaje VARCHAR(255),
+            origen VARCHAR(100),
+            filas_afectadas INT,
+            anyo_datos INT
         );"""
     ]
     
@@ -79,6 +80,7 @@ def cargar_datos_bd(path_parquet, tabla_destino, conn_id=CONN_ID):
         return
 
     anyo_lote = df['anyo'].iloc[0] 
+    cantidad_registros = len(df)
 
     engine = get_aws_engine(conn_id)
     
@@ -97,19 +99,29 @@ def cargar_datos_bd(path_parquet, tabla_destino, conn_id=CONN_ID):
             index=False
         )
         print(f"Insertados {len(df)} registros correctamente.")
+        mensaje_audit = f"Carga exitosa en {tabla_destino}"
 
-def crear_dim_alumnos(temp_path, gold_path):
+    registrar_actividad_bd(
+        estado="EXITO", 
+        mensaje=mensaje_audit, 
+        origen="cargar_datos_bd", 
+        conn_id=conn_id,
+        filas=cantidad_registros,
+        anyo=anyo_lote
+    )
+
+def crear_dim_alumnos(silver_path, gold_path, temp_path):
     subcarpetas = [d for d in os.listdir(temp_path) if os.path.isdir(os.path.join(temp_path, d))]
-    
-    import hashlib
+
+    count = 0
 
     for anyo_folder in subcarpetas:
-        ruta_csv = os.path.join(temp_path, anyo_folder, 'Alumnos.csv')
-        if not os.path.exists(ruta_csv): continue
+        ruta_csv_silver = os.path.join(silver_path, anyo_folder, 'Alumnos.csv')
+        if not os.path.exists(ruta_csv_silver): continue
             
-        df = pd.read_csv(ruta_csv)
+        df = pd.read_csv(ruta_csv_silver)
         
-        df['NIA'] = df['NIA'].astype(str).apply(lambda x: hashlib.sha256(x.encode()).hexdigest()[:10])
+        df['NIA'] = df['NIA'].astype(str)
 
         cols_db = ['anyo', 'NIA', 'fecha_nac', 'sexo', 'estado_matricula', 'curso', 'grupo', 'turno']
         df = df[cols_db].copy()
@@ -123,11 +135,15 @@ def crear_dim_alumnos(temp_path, gold_path):
         df.to_parquet(archivo_parquet, index=False)
         
         cargar_datos_bd(archivo_parquet, 'Analisis.Dim_Alumnos')
+        count += 1
+
+    return count
 
 def crear_dim_modulos(temp_path, gold_path):
     
     subcarpetas = [d for d in os.listdir(temp_path) if os.path.isdir(os.path.join(temp_path, d))]
     
+    count = 0
     for anyo_folder in subcarpetas:
         ruta_anyo_temp = os.path.join(temp_path, anyo_folder)
         
@@ -160,16 +176,19 @@ def crear_dim_modulos(temp_path, gold_path):
         print(f"[{anyo_folder}] Parquet generado.")
         
         cargar_datos_bd(archivo_parquet, 'Analisis.Dim_Modulos')
+        count += 1
 
+    return count
 
-def crear_fact_calificaciones(temp_path, gold_path):
+def crear_fact_calificaciones(silver_path, gold_path, temp_path):
     subcarpetas = [d for d in os.listdir(temp_path) if os.path.isdir(os.path.join(temp_path, d))]
     
+    count = 0
     for anyo_folder in subcarpetas:
-        ruta_csv = os.path.join(temp_path, anyo_folder, 'Calificaciones.csv')
-        if not os.path.exists(ruta_csv): continue
+        ruta_csv_silver = os.path.join(silver_path, anyo_folder, 'Calificaciones.csv')
+        if not os.path.exists(ruta_csv_silver): continue
             
-        df = pd.read_csv(ruta_csv)
+        df = pd.read_csv(ruta_csv_silver)
         
         if 'alumno' in df.columns: df = df.rename(columns={'alumno': 'nia'})
             
@@ -184,13 +203,68 @@ def crear_fact_calificaciones(temp_path, gold_path):
         df.to_parquet(archivo_parquet, index=False)
         
         cargar_datos_bd(archivo_parquet, 'Analisis.Fact_Calificaciones')
+        count += 1
 
-def registro_log_gold(gold_path, log_path):
+    return count
+
+def combinar_archivos_gold(**context):
+    ti = context['ti']
+    
+    dim_alumnos = ti.xcom_pull(task_ids='crear_dim_alumnos') or []
+    dim_modulos = ti.xcom_pull(task_ids='crear_dim_modulos') or []
+    fact_calif = ti.xcom_pull(task_ids='crear_fact_calificaciones') or []
+    
+    todos = dim_alumnos + dim_modulos + fact_calif
+    return todos
+
+def registro_log_gold(gold_path, log_path, conteos):
     if not os.path.exists(log_path):
         os.makedirs(log_path)
-    archivos = [f for f in os.listdir(gold_path) if f.endswith('.parquet')]
-    cantidad = len(archivos)
+    
+    cantidad = sum([int(c) for c in conteos if c is not None])
+    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     mensaje = f"[{timestamp}] Se han procesado {cantidad} archivos Parquet en la carpeta {gold_path}\n"
+    
     with open(os.path.join(log_path, 'log_etl.txt'), 'a') as f:
         f.write(mensaje)
+
+def registrar_actividad_bd(estado, mensaje, origen, conn_id, filas=None, anyo=None):
+    try:
+        engine = get_aws_engine(conn_id)
+        
+        query = text("""
+            INSERT INTO Analisis.Log_Actividad 
+            (estado, mensaje, origen, filas_afectadas, anyo_datos)
+            VALUES (:estado, :mensaje, :origen, :filas, :anyo)
+        """)
+        
+        with engine.connect() as conn:
+            conn.execute(query, {
+                "estado": estado, 
+                "mensaje": mensaje, 
+                "origen": origen,
+                "filas": filas,
+                "anyo": anyo
+            })
+            if hasattr(conn, 'commit'): conn.commit()
+            
+    except Exception as e:
+        print(f"Error escribiendo log en BD: {e}")
+
+def limpiar_datos_temp(temp_path):
+    if not os.path.exists(temp_path):
+        return
+    
+    for elemento in os.listdir(temp_path):
+        ruta_elemento = os.path.join(temp_path, elemento)
+        
+        try:
+            if os.path.isdir(ruta_elemento):
+                shutil.rmtree(ruta_elemento)
+                print(f"Carpeta borrada: {elemento}")
+            else:
+                os.remove(ruta_elemento)
+                print(f"Archivo borrado: {elemento}")
+        except Exception as e:
+            print(f"No se pudo borrar {elemento}: {e}")
