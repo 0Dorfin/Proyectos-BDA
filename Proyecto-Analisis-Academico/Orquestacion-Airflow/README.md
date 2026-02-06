@@ -63,22 +63,26 @@ docker compose up -d
 ### Flujo de Trabajo (DAGs)
 El sistema fucniona mediante un enfoque Data Driven (dirigido por datos) para hacer la ejecución basada en la disponibilidad de la información:
 1. **dag_ingesta_academica**:
-   * Escucha la carpeta **data/raw/** cada 5 minutos.
-   * Valida los XML y los mueve a **S3/bronze**
-   * Extrae datos crudos a **data/temp**
+   * Escucha la carpeta `data/raw/` cada 5 minutos.
+   * Valida los XML y los mueve a `S3/bronze`
+   * Extrae datos crudos a `data/temp`
+   * Archiva los XML originales en `data/archive` para histórico.
+   * Genera el registro de control en el log físico.
    * Produce el **batch_ready**
 2. **dag_transformaciones**:
-   * Se activa automáticamente al recibir el **batch_ready**.
+   * Se activa automáticamente al recibir el `batch_ready`.
    * Limpia y normaliza alumnos, calificaciones, cursos y modulos.
-   * Genera CSVs en **S3/silver**
-   * Produce el **curated_ready**
+   * Genera CSVs en `S3/silver`
+   * Genera el registro de control en el log físico.
+   * Produce el `curated_ready`
 3. **dag_carga_warehouse**:
-   * Se activa automáticamente al recibir el **curated_ready**.
+   * Se activa automáticamente al recibir el `curated_ready`.
    * Crea tablas en MySQL si no existen.
-   * Transforma CSVs a Parquet en **S3/gold**
+   * Transforma CSVs a Parquet en `S3/gold`
+   * Genera el registro de control en el log físico.
    * **Carga transaccional:** Inserta datos en MySQL con lógica de borrado previo por año
-   * **Limpieza:** Elimina los archivos de **data/temp** para dejar el entorno listo para el siguiente lote
+   * **Limpieza:** Elimina los archivos de `data/temp` para dejar el entorno listo para el siguiente lote
 
 ### Sistema de Logs y Auditoría
-* **Log Físico:** El fichero **output/logs/log_etl.txt** registra el número de archivos procesados en cada capa, validando el movimiento físico de datos.
-* **Log de Base de Datos:** **La tabla Analisis.Log_Actividad** registra el estado de cada carga  en el Warehouse con métricas detalladas.
+* **Log Físico:** El fichero `output/logs/log_etl.txt` registra el número de archivos procesados en cada capa, validando el movimiento físico de datos.
+* **Log de Base de Datos:** La tabla `Analisis.Log_Actividad` registra el estado de cada carga  en el Warehouse con métricas detalladas.
