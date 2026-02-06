@@ -2,7 +2,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.datasets import Dataset as Asset
 from datetime import datetime
-from include.carga_warehouse_utils import limpiar_alumnos, limpiar_calificaciones, limpiar_cursos_modulos, registro_log_silver
+from include.transformaciones_utils import limpiar_alumnos, limpiar_calificaciones, limpiar_cursos_modulos, combinar_archivos_silver, registro_log_silver
 
 SILVER_PATH = "/opt/airflow/S3/silver/"
 LOG_PATH = "/opt/airflow/output/logs/"
@@ -42,11 +42,25 @@ with DAG(
         python_callable=limpiar_cursos_modulos,
         op_kwargs={"temp_path": TEMP_PATH, "silver_path": SILVER_PATH}
     )
+
+    t_combinar_archivos_silver = PythonOperator(
+        task_id="combinar_archivos_silver",
+        python_callable=combinar_archivos_silver,
+    )
+
     t_log_silver = PythonOperator(
         task_id="registrar_log_silver",
         python_callable=registro_log_silver,
-        op_kwargs={"silver_path": SILVER_PATH, "log_path": LOG_PATH},
+        op_kwargs={
+            "conteos": [
+                "{{ ti.xcom_pull(task_ids='limpiar_alumnos') }}",
+                "{{ ti.xcom_pull(task_ids='limpiar_calificaciones') }}",
+                "{{ ti.xcom_pull(task_ids='limpiar_cursos_modulos') }}"
+            ],
+            "silver_path": SILVER_PATH, 
+            "log_path": LOG_PATH
+        },
         outlets=[CURATED_READY]
     )
 
-    [t_alumnos, t_calificaciones, t_cursos_modulos] >> t_log_silver
+    [t_alumnos, t_calificaciones, t_cursos_modulos] >> t_combinar_archivos_silver >> t_log_silver
