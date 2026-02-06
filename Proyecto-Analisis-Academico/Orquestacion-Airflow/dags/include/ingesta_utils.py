@@ -110,6 +110,7 @@ def copiar_xml_a_s3_bronze(raw_path, s3_bronze_path):
         os.makedirs(s3_bronze_path)
     
     archivos_raw = [f for f in os.listdir(raw_path) if f.endswith('.xml')]
+    count = 0
     
     for f in archivos_raw:
         ruta_f = os.path.join(raw_path, f)
@@ -126,7 +127,9 @@ def copiar_xml_a_s3_bronze(raw_path, s3_bronze_path):
             
             os.makedirs(carpeta_destino)
             shutil.copy(ruta_f, os.path.join(carpeta_destino, f))
-
+            count += 1
+            
+    return count
 
 def anonimizar_xml(input_path, output_path):
     try:
@@ -176,15 +179,14 @@ def anonimizar_xml(input_path, output_path):
     except Exception as e:
         print(f"Error al procesar el XML: {e}")
 
-
-def registro_log_bronze(bronze_path, log_path):
+def registro_log_bronze(bronze_path, log_path, cantidad):
     if not os.path.exists(log_path):
         os.makedirs(log_path)
-    archivos = [f for f in os.listdir(bronze_path) if f.endswith('.xml')]
-    cantidad = len(archivos)
-
+    
+    palabra = "archivo" if cantidad == 1 else "archivos"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    mensaje = f"[{timestamp}] Ingesta completada. Se ha procesado {cantidad} archivo XML en la carpeta {bronze_path}\n"
+    
+    mensaje = f"[{timestamp}] Ingesta completada. Se ha procesado {cantidad} {palabra} XML en la carpeta {bronze_path}\n"
 
     with open(os.path.join(log_path, 'log_etl.txt'), 'a') as f:
         f.write(mensaje)
