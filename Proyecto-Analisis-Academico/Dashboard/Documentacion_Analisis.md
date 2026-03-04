@@ -50,34 +50,24 @@ proyecto_clausulas/
 ## Modelo de Datos
 
 ```text
-                    ┌─────────────────────┐
-                    │   dim_categorias     │
-                    │─────────────────────│
-                    │ id_categoria (PK)    │
-                    │ categoria            │
-                    │ articulo_trlgdcu     │
-                    │ descripcion_legal    │
-                    │ gravedad             │
-                    │ total_patrones       │
-                    │ total_detecciones    │
-                    └────────┬────────────┘
-                             │
-┌─────────────────────┐      │      ┌──────────────────────────┐
-│   dim_empresas       │      │      │ fact_clausulas_detectadas │
-│─────────────────────│      │      │──────────────────────────│
-│ id_empresa (PK)      │◄─────┼─────►│ id_deteccion (PK)        │
-│ empresa              │      │      │ id_empresa (FK)           │
-│ anio                 │      │      │ id_categoria (FK)         │
-│ servicio             │      └──────│ empresa                   │
-│ archivo_origen       │             │ anio                      │
-│ total_lineas         │             │ archivo                   │
-│ total_lineas_limpias │             │ categoria                 │
-│ total_palabras       │             │ patron_detectado          │
-│ densidad_lexica      │             │ texto_limpio              │
-│ total_clausulas_abus.│             │ texto_original            │
-│ indice_abusividad    │             │ gravedad                  │
-│ cat_predominante     │             └──────────────────────────┘
-└─────────────────────┘
+┌────────────────────────────┐           ┌─────────────────────────────────────┐           ┌────────────────────────────┐
+│        dim_empresas        │           │      fact_clausulas_detectadas      │           │       dim_categorias       │
+├────────────────────────────┤           ├─────────────────────────────────────┤           ├────────────────────────────┤
+│ empresa_anio (PK)          │───┐       │ id_deteccion (PK)                   │       ┌───│ id_categoria (PK)          │
+│ id_empresa                 │   │       │ empresa_anio (FK)          ◄────────┼───────┘   │ categoria                  │
+│ empresa                    │   │       │ id_categoria (FK)          ◄────────┼───────────┘ gravedad                   │
+│ anio                       │   └──────►│ id_empresa                          │           │ articulo_trlgdcu           │
+│ servicio                   │           │ empresa                             │           │ descripcion_legal          │
+│ archivo_origen             │           │ anio                                │           │ empresas_afectadas         │
+│ categoria_predominante     │           │ archivo                             │           │ num_empresas_afectadas     │
+│ densidad_lexica            │           │ categoria                           │           │ total_detecciones          │
+│ indice_abusividad          │           │ gravedad                            │           │ total_patrones             │
+│ orden_empresa              │           │ patron_detectado                    │           │                            │
+│ total_clausulas_abusivas   │           │ texto_limpio                        │           │                            │
+│ total_lineas               │           │ texto_original                      │           │                            │
+│ total_lineas_limpias       │           │ Texto_Corto                         │           │                            │
+│ total_palabras             │           └─────────────────────────────────────┘           └────────────────────────────┘
+└────────────────────────────┘
 ```
 
 ---
