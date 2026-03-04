@@ -74,12 +74,13 @@
 ### 3. Columnas creadas para cada Tabla
 
 ### Tabla de Hechos: `fact_clausulas_detectadas`
-
+- empresa_anio (para relacionarla don dim_empresas)
 - Texto corto (para la tabla detallada)
 
 ### Tabla de Dimensión: `dim_empresas`
-
+- empresa_anio
 - Periodo
+- orden_empresa
 
 ---
 
