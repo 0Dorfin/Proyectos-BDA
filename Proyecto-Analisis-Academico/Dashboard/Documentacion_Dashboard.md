@@ -71,7 +71,7 @@
 
 ---
 
-### 3. Columnas creadas para cada Tabla
+### 4. Columnas creadas para cada Tabla
 
 ### Tabla de Hechos: `fact_clausulas_detectadas`
 - empresa_anio (para relacionarla don dim_empresas)
@@ -86,7 +86,7 @@
 
 ---
 
-## 2. Medidas creadas para cada Tabla
+### 5. Medidas creadas para cada Tabla
 
 ### Tabla de Hechos `fact_clausulas_detectadas`
 
